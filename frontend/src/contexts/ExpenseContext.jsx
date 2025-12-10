@@ -25,27 +25,49 @@ export const ExpenseProvider = ({ children }) => {
         setPagination(prev => ({ ...prev, total: data.total || 0 }));
     };
 
-    const fetchSummary = async (month) => {
-        if (!month) return;
-        const { data } = await api.get(`/expenses/summary?month=${month}`);
-        setSummary(data);
+    const fetchSummary = async (month = null) => {
+        if (!user) return;
+
+        try {
+            let url = '/expenses/summary';
+            if (month) {
+                url += `?month=${month}`;
+            }
+
+            const { data } = await api.get(url);
+            setSummary(data || []);
+        } catch (error) {
+            console.error('Error fetching summary:', error);
+            setSummary([]);
+        }
     };
 
     const addExpense = async (expense) => {
         const { data } = await api.post('/expenses', expense);
         setExpenses(prev => [data, ...prev]);
+        // Refresh summary if we have a month filter
+        if (filters.month) {
+            await fetchSummary(filters.month);
+        }
     };
 
     const updateExpense = async (id, updated) => {
         const { data } = await api.put(`/expenses/${id}`, updated);
         setExpenses(prev => prev.map(exp => exp._id === id ? data : exp));
+        // Refresh summary if we have a month filter
+        if (filters.month) {
+            await fetchSummary(filters.month);
+        }
     };
 
     const deleteExpense = async (id) => {
         await api.delete(`/expenses/${id}`);
         setExpenses(prev => prev.filter(exp => exp._id !== id));
+        // Refresh summary if we have a month filter
+        if (filters.month) {
+            await fetchSummary(filters.month);
+        }
     };
-
 
     const exportToExcel = async (month) => {
         if (!month) {
@@ -57,7 +79,6 @@ export const ExpenseProvider = ({ children }) => {
             const response = await api.get(`/expenses/export?month=${month}`, {
                 responseType: 'blob',
             });
-
 
             const url = window.URL.createObjectURL(new Blob([response.data]));
             const link = document.createElement('a');
